@@ -474,7 +474,53 @@ def main():
         st.header("System Analytics")
         
         if len(rules) > 0:
+            # Add evaluation toggle
+            run_evaluation = st.checkbox("Run System Evaluation (Precision, Recall, F1)", value=False, help="This may take some time but will show performance metrics")
+            
+            if run_evaluation:
+                evaluation_results = evaluate_recommender_system(rules, test_user_games, genre_fallback, game_data)
+                
+                if evaluation_results:
+                    st.subheader("📊 Performance Metrics")
+                    
+                    # Create columns for each k value
+                    eval_cols = st.columns(3)
+                    
+                    for i, k in enumerate([5, 10, 20]):
+                        if k in evaluation_results:
+                            with eval_cols[i]:
+                                metrics = evaluation_results[k]
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <h3>Top {k} Recommendations</h3>
+                                    <p><strong>Precision:</strong> {metrics['precision']:.3f}</p>
+                                    <p><strong>Recall:</strong> {metrics['recall']:.3f}</p>
+                                    <p><strong>F1-Score:</strong> {metrics['f1']:.3f}</p>
+                                    <p><strong>Users Evaluated:</strong> {metrics['evaluated_users']}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    # Explanation of metrics
+                    with st.expander("📖 Understanding the Metrics"):
+                        st.markdown("""
+                        **Precision**: Out of all games we recommended, how many were actually relevant to the user?
+                        - Higher is better (fewer false positives)
+                        - Range: 0.0 to 1.0
+                        
+                        **Recall**: Out of all games the user actually liked, how many did we recommend?
+                        - Higher is better (fewer missed opportunities)
+                        - Range: 0.0 to 1.0
+                        
+                        **F1-Score**: Harmonic mean of precision and recall
+                        - Balances both precision and recall
+                        - Higher is better overall performance
+                        - Range: 0.0 to 1.0
+                        """)
+                else:
+                    st.warning("Could not generate evaluation results. Check if test data is available.")
+            
             # Create visualizations
+            st.subheader("📈 Association Rules Visualization")
             col1, col2 = st.columns(2)
             
             with col1:
@@ -496,7 +542,7 @@ def main():
                 st.pyplot(fig)
             
             # Rules statistics
-            st.subheader("Rules Statistics")
+            st.subheader("📊 Rules Statistics")
             col1, col2, col3 = st.columns(3)
             
             with col1:
