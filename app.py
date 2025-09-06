@@ -474,46 +474,28 @@ def main():
         st.header("System Analytics")
         
         if len(rules) > 0:
-            # Create visualizations only if plotting libraries are available
-            if HAS_PLOTTING:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    scatter = ax.scatter(rules['support'], rules['confidence'], 
-                                       alpha=0.6, c=rules['lift'], cmap='viridis')
-                    ax.set_xlabel('Support')
-                    ax.set_ylabel('Confidence')
-                    ax.set_title('Association Rules: Support vs Confidence')
-                    plt.colorbar(scatter, label='Lift')
-                    st.pyplot(fig)
-                
-                with col2:
-                    fig, ax = plt.subplots(figsize=(8, 6))
-                    ax.hist(rules['confidence'], bins=30, alpha=0.7, edgecolor='black')
-                    ax.set_xlabel('Confidence')
-                    ax.set_ylabel('Frequency')
-                    ax.set_title('Confidence Distribution')
-                    st.pyplot(fig)
-            else:
-                st.info("Install matplotlib and seaborn to see visualizations")
-                
-                # Alternative: Show data tables instead
-                st.subheader("Rules Data Summary")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.write("**Top 10 Rules by Confidence**")
-                    top_conf = rules.nlargest(10, 'confidence')[['confidence', 'lift', 'support']]
-                    st.dataframe(top_conf)
-                
-                with col2:
-                    st.write("**Rules Distribution**")
-                    st.write("Confidence range:", f"{rules['confidence'].min():.3f} - {rules['confidence'].max():.3f}")
-                    st.write("Lift range:", f"{rules['lift'].min():.3f} - {rules['lift'].max():.3f}")
-                    st.write("Support range:", f"{rules['support'].min():.4f} - {rules['support'].max():.4f}")
+            # Create visualizations
+            col1, col2 = st.columns(2)
             
-            # Rules statistics (always available)
+            with col1:
+                fig, ax = plt.subplots(figsize=(8, 6))
+                scatter = ax.scatter(rules['support'], rules['confidence'], 
+                                   alpha=0.6, c=rules['lift'], cmap='viridis')
+                ax.set_xlabel('Support')
+                ax.set_ylabel('Confidence')
+                ax.set_title('Association Rules: Support vs Confidence')
+                plt.colorbar(scatter, label='Lift')
+                st.pyplot(fig)
+            
+            with col2:
+                fig, ax = plt.subplots(figsize=(8, 6))
+                ax.hist(rules['confidence'], bins=30, alpha=0.7, edgecolor='black')
+                ax.set_xlabel('Confidence')
+                ax.set_ylabel('Frequency')
+                ax.set_title('Confidence Distribution')
+                st.pyplot(fig)
+            
+            # Rules statistics
             st.subheader("Rules Statistics")
             col1, col2, col3 = st.columns(3)
             
