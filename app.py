@@ -406,12 +406,7 @@ def main():
     sample_size = st.sidebar.slider("Sample Size", 1000, 50000, 25000, 1000)
     min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
     top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
-    
-    # Sidebar configuration
-    st.sidebar.header("⚙️ Configuration")
-    sample_size = st.sidebar.slider("Sample Size", 1000, 50000, 25000, 1000)
-    min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
-    top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
+
     
     # Export functionality (only show if cache files exist)
     if os.path.exists("enhanced_association_rules.pkl") or os.path.exists("evaluation_results.pkl"):
