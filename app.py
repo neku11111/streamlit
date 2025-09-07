@@ -881,7 +881,7 @@ def main():
                     """)
                     
                     # Save results option
-                    if st.button("💾 Save Evaluation Results"):
+                    if st.button("💾 Save Evaluation Results", key="save_evaluation_btn"):
                         try:
                             with open("evaluation_results.pkl", 'wb') as f:
                                 pickle.dump(evaluation_results, f)
