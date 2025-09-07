@@ -1,12 +1,4 @@
-with tab2:
-        st.header("System Analytics")
-        
-        # Get rules from session state
-        rules_data = st.session_state.get('rules', pd.DataFrame())
-        
-        if not rules_data.empty:
-            # Add evaluation toggle
-            run_evaluation = st.checkbox("Run Systimport streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -566,14 +558,18 @@ def main():
     with tab3:
         st.header("Explore Association Rules")
         
-        if len(rules) > 0:
+        # Get rules from session state
+        rules_data = st.session_state.get('rules', pd.DataFrame())
+        game_meta = st.session_state.get('game_data', {})
+        
+        if not rules_data.empty:
             # Filter rules
             min_confidence = st.slider("Minimum Confidence", 0.0, 1.0, 0.5, 0.05)
-            min_lift = st.slider("Minimum Lift", 1.0, float(rules['lift'].max()), 1.5, 0.1)
+            min_lift = st.slider("Minimum Lift", 1.0, float(rules_data['lift'].max()), 1.5, 0.1)
             
-            filtered_rules = rules[
-                (rules['confidence'] >= min_confidence) & 
-                (rules['lift'] >= min_lift)
+            filtered_rules = rules_data[
+                (rules_data['confidence'] >= min_confidence) & 
+                (rules_data['lift'] >= min_lift)
             ].head(20)
             
             if len(filtered_rules) > 0:
@@ -586,9 +582,9 @@ def main():
                     con_names = [format_game_name(g) for g in con]
                     
                     # Enhance names with metadata if available
-                    if game_data:
-                        ant_names = [game_data.get(g, {"name": format_game_name(g)})["name"] for g in ant]
-                        con_names = [game_data.get(g, {"name": format_game_name(g)})["name"] for g in con]
+                    if game_meta:
+                        ant_names = [game_meta.get(g, {"name": format_game_name(g)})["name"] for g in ant]
+                        con_names = [game_meta.get(g, {"name": format_game_name(g)})["name"] for g in con]
                     
                     st.markdown(f"""
                     **Rule {i}:** {', '.join(ant_names)} → {', '.join(con_names)}
