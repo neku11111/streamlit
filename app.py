@@ -483,12 +483,46 @@ def main():
     # Cache management
     st.sidebar.subheader("🗂️ Cache Management")
     
-    # Show cache status
-    rules_cached = os.path.exists("enhanced_association_rules.pkl")
-    eval_cached = os.path.exists("evaluation_results.pkl")
+    # Direct download buttons for pickle files
+    if os.path.exists("enhanced_association_rules.pkl"):
+        with open("enhanced_association_rules.pkl", "rb") as f:
+            st.sidebar.download_button(
+                label="Download Association Rules (PKL)",
+                data=f.read(),
+                file_name="enhanced_association_rules.pkl",
+                mime="application/octet-stream",
+                key="download_rules_pkl"
+            )
     
-    st.sidebar.info(f"Rules Cache: {'✅ Available' if rules_cached else '❌ Missing'}")
-    st.sidebar.info(f"Evaluation Cache: {'✅ Available' if eval_cached else '❌ Missing'}")
+    if os.path.exists("evaluation_results.pkl"):
+        with open("evaluation_results.pkl", "rb") as f:
+            st.sidebar.download_button(
+                label="Download Evaluation Results (PKL)", 
+                data=f.read(),
+                file_name="evaluation_results.pkl",
+                mime="application/octet-stream",
+                key="download_eval_pkl"
+            )
+    
+    # Cache control buttons
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("🔄 Reload Data", key="reload_data_btn"):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col2:
+        if st.button("🗑️ Clear Cache", key="clear_cache_btn"):
+            try:
+                if os.path.exists("enhanced_association_rules.pkl"):
+                    os.remove("enhanced_association_rules.pkl")
+                if os.path.exists("evaluation_results.pkl"):
+                    os.remove("evaluation_results.pkl")
+                st.cache_data.clear()
+                st.sidebar.success("Cache cleared!")
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Error clearing cache: {e}")
     
     # Cache control buttons
     col1, col2 = st.sidebar.columns(2)
