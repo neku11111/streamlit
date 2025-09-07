@@ -407,93 +407,83 @@ def main():
     min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
     top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
     
-    # File location and export section
-    st.sidebar.subheader("📁 File Locations")
-    st.sidebar.text(f"Working directory: {os.getcwd()}")
+    # Sidebar configuration
+    st.sidebar.header("⚙️ Configuration")
+    sample_size = st.sidebar.slider("Sample Size", 1000, 50000, 25000, 1000)
+    min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
+    top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
     
-    # Show cache file locations
-    if os.path.exists("enhanced_association_rules.pkl"):
-        st.sidebar.success("Rules cache: Found")
-        st.sidebar.text(f"📄 {os.path.abspath('enhanced_association_rules.pkl')}")
-    else:
-        st.sidebar.info("Rules cache: Not found")
-    
-    if os.path.exists("evaluation_results.pkl"):
-        st.sidebar.success("Evaluation cache: Found")
-        st.sidebar.text(f"📄 {os.path.abspath('evaluation_results.pkl')}")
-    else:
-        st.sidebar.info("Evaluation cache: Not found")
-    
-    # Export functionality
-    st.sidebar.subheader("📦 Export Results")
-    
-    if st.sidebar.button("Export to CSV"):
-        exported_files = []
-        try:
-            # Export evaluation results
-            if os.path.exists("evaluation_results.pkl"):
-                with open("evaluation_results.pkl", 'rb') as f:
-                    results = pickle.load(f)
-                
-                # Convert to DataFrame
-                export_data = []
-                for k, metrics in results.items():
-                    export_data.append({
-                        'K': k,
-                        'Precision': metrics['precision'],
-                        'Recall': metrics['recall'],
-                        'F1_Score': metrics['f1'],
-                        'Users_Evaluated': metrics['evaluated_users']
-                    })
-                
-                df = pd.DataFrame(export_data)
-                df.to_csv("evaluation_results.csv", index=False)
-                exported_files.append("evaluation_results.csv")
-            
-            # Export association rules summary
-            if 'rules' in locals() and len(rules) > 0:
-                rules_summary = rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head(50)
-                # Convert frozensets to strings for CSV export
-                rules_summary = rules_summary.copy()
-                rules_summary['antecedents'] = rules_summary['antecedents'].apply(lambda x: ', '.join(list(x)))
-                rules_summary['consequents'] = rules_summary['consequents'].apply(lambda x: ', '.join(list(x)))
-                rules_summary.to_csv("association_rules_top50.csv", index=False)
-                exported_files.append("association_rules_top50.csv")
-            
-            if exported_files:
-                st.sidebar.success(f"Exported: {', '.join(exported_files)}")
-            else:
-                st.sidebar.warning("No data available to export")
-                
-        except Exception as e:
-            st.sidebar.error(f"Export failed: {e}")
-    
-    if st.sidebar.button("Create Project Zip"):
-        try:
-            import zipfile
-            import io
-            
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-                # Add cache files if they exist
-                if os.path.exists("enhanced_association_rules.pkl"):
-                    zip_file.write("enhanced_association_rules.pkl")
+    # Export functionality (only show if cache files exist)
+    if os.path.exists("enhanced_association_rules.pkl") or os.path.exists("evaluation_results.pkl"):
+        st.sidebar.subheader("📦 Export Results")
+        
+        if st.sidebar.button("Export to CSV"):
+            exported_files = []
+            try:
+                # Export evaluation results
                 if os.path.exists("evaluation_results.pkl"):
-                    zip_file.write("evaluation_results.pkl")
-                if os.path.exists("evaluation_results.csv"):
-                    zip_file.write("evaluation_results.csv")
-                if os.path.exists("association_rules_top50.csv"):
-                    zip_file.write("association_rules_top50.csv")
-            
-            zip_buffer.seek(0)
-            st.sidebar.download_button(
-                label="📥 Download Project Files",
-                data=zip_buffer.getvalue(),
-                file_name="steam_recommender_cache.zip",
-                mime="application/zip"
-            )
-        except Exception as e:
-            st.sidebar.error(f"Zip creation failed: {e}")
+                    with open("evaluation_results.pkl", 'rb') as f:
+                        results = pickle.load(f)
+                    
+                    # Convert to DataFrame
+                    export_data = []
+                    for k, metrics in results.items():
+                        export_data.append({
+                            'K': k,
+                            'Precision': metrics['precision'],
+                            'Recall': metrics['recall'],
+                            'F1_Score': metrics['f1'],
+                            'Users_Evaluated': metrics['evaluated_users']
+                        })
+                    
+                    df = pd.DataFrame(export_data)
+                    df.to_csv("evaluation_results.csv", index=False)
+                    exported_files.append("evaluation_results.csv")
+                
+                # Export association rules summary
+                if 'rules' in locals() and len(rules) > 0:
+                    rules_summary = rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head(50)
+                    # Convert frozensets to strings for CSV export
+                    rules_summary = rules_summary.copy()
+                    rules_summary['antecedents'] = rules_summary['antecedents'].apply(lambda x: ', '.join(list(x)))
+                    rules_summary['consequents'] = rules_summary['consequents'].apply(lambda x: ', '.join(list(x)))
+                    rules_summary.to_csv("association_rules_top50.csv", index=False)
+                    exported_files.append("association_rules_top50.csv")
+                
+                if exported_files:
+                    st.sidebar.success(f"Exported: {', '.join(exported_files)}")
+                else:
+                    st.sidebar.warning("No data available to export")
+                    
+            except Exception as e:
+                st.sidebar.error(f"Export failed: {e}")
+        
+        if st.sidebar.button("Create Project Zip"):
+            try:
+                import zipfile
+                import io
+                
+                zip_buffer = io.BytesIO()
+                with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                    # Add cache files if they exist
+                    if os.path.exists("enhanced_association_rules.pkl"):
+                        zip_file.write("enhanced_association_rules.pkl")
+                    if os.path.exists("evaluation_results.pkl"):
+                        zip_file.write("evaluation_results.pkl")
+                    if os.path.exists("evaluation_results.csv"):
+                        zip_file.write("evaluation_results.csv")
+                    if os.path.exists("association_rules_top50.csv"):
+                        zip_file.write("association_rules_top50.csv")
+                
+                zip_buffer.seek(0)
+                st.sidebar.download_button(
+                    label="📥 Download Project Files",
+                    data=zip_buffer.getvalue(),
+                    file_name="steam_recommender_cache.zip",
+                    mime="application/zip"
+                )
+            except Exception as e:
+                st.sidebar.error(f"Zip creation failed: {e}")
     
     # Cache management
     st.sidebar.subheader("🗂️ Cache Management")
