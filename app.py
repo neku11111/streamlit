@@ -407,6 +407,94 @@ def main():
     min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
     top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
     
+    # File location and export section
+    st.sidebar.subheader("📁 File Locations")
+    st.sidebar.text(f"Working directory: {os.getcwd()}")
+    
+    # Show cache file locations
+    if os.path.exists("enhanced_association_rules.pkl"):
+        st.sidebar.success("Rules cache: Found")
+        st.sidebar.text(f"📄 {os.path.abspath('enhanced_association_rules.pkl')}")
+    else:
+        st.sidebar.info("Rules cache: Not found")
+    
+    if os.path.exists("evaluation_results.pkl"):
+        st.sidebar.success("Evaluation cache: Found")
+        st.sidebar.text(f"📄 {os.path.abspath('evaluation_results.pkl')}")
+    else:
+        st.sidebar.info("Evaluation cache: Not found")
+    
+    # Export functionality
+    st.sidebar.subheader("📦 Export Results")
+    
+    if st.sidebar.button("Export to CSV"):
+        exported_files = []
+        try:
+            # Export evaluation results
+            if os.path.exists("evaluation_results.pkl"):
+                with open("evaluation_results.pkl", 'rb') as f:
+                    results = pickle.load(f)
+                
+                # Convert to DataFrame
+                export_data = []
+                for k, metrics in results.items():
+                    export_data.append({
+                        'K': k,
+                        'Precision': metrics['precision'],
+                        'Recall': metrics['recall'],
+                        'F1_Score': metrics['f1'],
+                        'Users_Evaluated': metrics['evaluated_users']
+                    })
+                
+                df = pd.DataFrame(export_data)
+                df.to_csv("evaluation_results.csv", index=False)
+                exported_files.append("evaluation_results.csv")
+            
+            # Export association rules summary
+            if 'rules' in locals() and len(rules) > 0:
+                rules_summary = rules[['antecedents', 'consequents', 'support', 'confidence', 'lift']].head(50)
+                # Convert frozensets to strings for CSV export
+                rules_summary = rules_summary.copy()
+                rules_summary['antecedents'] = rules_summary['antecedents'].apply(lambda x: ', '.join(list(x)))
+                rules_summary['consequents'] = rules_summary['consequents'].apply(lambda x: ', '.join(list(x)))
+                rules_summary.to_csv("association_rules_top50.csv", index=False)
+                exported_files.append("association_rules_top50.csv")
+            
+            if exported_files:
+                st.sidebar.success(f"Exported: {', '.join(exported_files)}")
+            else:
+                st.sidebar.warning("No data available to export")
+                
+        except Exception as e:
+            st.sidebar.error(f"Export failed: {e}")
+    
+    if st.sidebar.button("Create Project Zip"):
+        try:
+            import zipfile
+            import io
+            
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                # Add cache files if they exist
+                if os.path.exists("enhanced_association_rules.pkl"):
+                    zip_file.write("enhanced_association_rules.pkl")
+                if os.path.exists("evaluation_results.pkl"):
+                    zip_file.write("evaluation_results.pkl")
+                if os.path.exists("evaluation_results.csv"):
+                    zip_file.write("evaluation_results.csv")
+                if os.path.exists("association_rules_top50.csv"):
+                    zip_file.write("association_rules_top50.csv")
+            
+            zip_buffer.seek(0)
+            st.sidebar.download_button(
+                label="📥 Download Project Files",
+                data=zip_buffer.getvalue(),
+                file_name="steam_recommender_cache.zip",
+                mime="application/zip"
+            )
+        except Exception as e:
+            st.sidebar.error(f"Zip creation failed: {e}")
+    
     # Cache management
     st.sidebar.subheader("🗂️ Cache Management")
     
@@ -497,17 +585,42 @@ def main():
                 user_games = [game.strip() for game in games_input.split('\n') if game.strip()]
         
         else:
-            # Get popular games from the dataset
-            if top_games:
-                popular_games = sorted(list(top_games))[:100]  # Top 100 for selection
-                formatted_games = [format_game_name(game) for game in popular_games]
+            # Get most popular games by frequency in training data
+            if top_games and train_transactions:
+                # Count game frequency in training transactions
+                all_training_games = [game for transaction in train_transactions for game in transaction]
+                game_counts = Counter(all_training_games)
+                
+                # Get top 20 most popular games
+                most_popular_games = [game for game, count in game_counts.most_common(20)]
+                
+                # Format names for display
+                formatted_games_with_counts = []
+                for game in most_popular_games:
+                    display_name = format_game_name(game)
+                    if game in game_data:
+                        display_name = game_data[game].get("name", display_name)
+                    count = game_counts[game]
+                    formatted_games_with_counts.append(f"{display_name} ({count} users)")
                 
                 selected_games = st.multiselect(
-                    "Select your favorite games:",
-                    formatted_games,
+                    "Select your favorite games (Top 20 most popular):",
+                    formatted_games_with_counts,
                     default=[]
                 )
-                user_games = [normalize_name(game) for game in selected_games]
+                
+                # Extract original normalized names
+                user_games = []
+                for selected in selected_games:
+                    # Remove the count part and find the original game
+                    display_name = selected.split(" (")[0]
+                    for game in most_popular_games:
+                        formatted_name = format_game_name(game)
+                        if game in game_data:
+                            formatted_name = game_data[game].get("name", formatted_name)
+                        if formatted_name == display_name:
+                            user_games.append(game)
+                            break
         
         # Get recommendations
         if st.button("🚀 Get Recommendations", type="primary"):
