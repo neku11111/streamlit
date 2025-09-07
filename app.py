@@ -236,6 +236,121 @@ def load_game_metadata():
         st.error(f"Error loading metadata: {e}")
         return {}, {}
 
+@st.cache_data
+def evaluate_recommender_system(rules, test_user_games, genre_fallback, game_data, cache_file="evaluation_results.pkl"):
+    """Evaluate the recommender system with caching"""
+    try:
+        if rules.empty:
+            st.error("No association rules available for evaluation")
+            return {}
+            
+        if not test_user_games:
+            st.error("No test user data available for evaluation")
+            return {}
+        
+        # Try to load cached evaluation results
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, 'rb') as f:
+                    cached_results = pickle.load(f)
+                st.success("✅ Loaded evaluation results from cache")
+                return cached_results
+            except Exception as e:
+                st.warning(f"Could not load cached evaluation: {e}. Running evaluation...")
+        
+        st.info("🔄 Running system evaluation... (this may take a moment)")
+        
+        k_values = [5, 10, 20]
+        min_games_for_eval = 5
+        eligible_test_users = {uid: games for uid, games in test_user_games.items() 
+                              if len(games) >= min_games_for_eval}
+        
+        if len(eligible_test_users) == 0:
+            st.error("No eligible test users found (need users with at least 5 games)")
+            return {}
+        
+        max_eval_users = min(600, len(eligible_test_users))
+        eval_user_ids = np.random.choice(list(eligible_test_users.keys()), max_eval_users, replace=False)
+        
+        evaluation_results = {}
+        for k in k_values:
+            evaluation_results[k] = {'precision_scores': [], 'recall_scores': [], 'f1_scores': []}
+        
+        users_evaluated = 0
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        for i, user_id in enumerate(eval_user_ids):
+            if i % 10 == 0:  # Update status every 10 users
+                status_text.text(f"Evaluating user {i+1}/{len(eval_user_ids)}")
+            progress_bar.progress((i + 1) / len(eval_user_ids))
+            
+            user_games_list = list(eligible_test_users[user_id])
+            try:
+                user_train_games, user_test_games = train_test_split(user_games_list, test_size=0.3, random_state=42)
+            except Exception:
+                continue
+            
+            if len(user_train_games) == 0 or len(user_test_games) == 0:
+                continue
+                
+            for k in k_values:
+                try:
+                    recommendations = recommend_games_enhanced(user_train_games, rules, genre_fallback, game_data, top_n=k)
+                    
+                    if len(recommendations) == 0:
+                        precision = recall = f1 = 0.0
+                    else:
+                        rec_set = set(normalize_name(rec[0]) for rec in recommendations)
+                        test_set = set(normalize_name(game) for game in user_test_games)
+                        
+                        true_positives = len(rec_set.intersection(test_set))
+                        precision = true_positives / len(rec_set) if len(rec_set) > 0 else 0.0
+                        recall = true_positives / len(test_set) if len(test_set) > 0 else 0.0
+                        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+                    
+                    evaluation_results[k]['precision_scores'].append(precision)
+                    evaluation_results[k]['recall_scores'].append(recall)
+                    evaluation_results[k]['f1_scores'].append(f1)
+                    
+                except Exception as e:
+                    st.warning(f"Error evaluating user {user_id} for k={k}: {e}")
+                    continue
+            
+            users_evaluated += 1
+        
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Calculate averages
+        final_results = {}
+        for k in k_values:
+            if len(evaluation_results[k]['precision_scores']) > 0:
+                final_results[k] = {
+                    'precision': np.mean(evaluation_results[k]['precision_scores']),
+                    'recall': np.mean(evaluation_results[k]['recall_scores']),
+                    'f1': np.mean(evaluation_results[k]['f1_scores']),
+                    'evaluated_users': len(evaluation_results[k]['precision_scores'])
+                }
+        
+        if not final_results:
+            st.error("Evaluation failed - no valid results obtained")
+            return {}
+        
+        # Save evaluation results
+        try:
+            with open(cache_file, 'wb') as f:
+                pickle.dump(final_results, f)
+            st.success("✅ Evaluation completed and results saved")
+        except Exception as e:
+            st.warning(f"Evaluation completed but could not save cache: {e}")
+        
+        return final_results
+        
+    except Exception as e:
+        st.error(f"Critical error during evaluation: {e}")
+        return {}
+
 def recommend_games_enhanced(user_games, rules, fallback_map=None, game_data=None, top_n=5):
     """Enhanced recommendation function"""
     user_game_set = set(normalize_name(g) for g in user_games)
