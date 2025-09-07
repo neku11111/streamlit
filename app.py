@@ -524,25 +524,6 @@ def main():
             except Exception as e:
                 st.sidebar.error(f"Error clearing cache: {e}")
     
-    # Cache control buttons
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        if st.button("🔄 Reload Data"):
-            st.cache_data.clear()
-            st.rerun()
-    
-    with col2:
-        if st.button("🗑️ Clear Cache"):
-            try:
-                if os.path.exists("enhanced_association_rules.pkl"):
-                    os.remove("enhanced_association_rules.pkl")
-                if os.path.exists("evaluation_results.pkl"):
-                    os.remove("evaluation_results.pkl")
-                st.cache_data.clear()
-                st.sidebar.success("Cache cleared!")
-                st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Error clearing cache: {e}")
     
     # Initialize session state
     if 'data_loaded' not in st.session_state:
