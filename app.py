@@ -1,4 +1,12 @@
-import streamlit as st
+with tab2:
+        st.header("System Analytics")
+        
+        # Get rules from session state
+        rules_data = st.session_state.get('rules', pd.DataFrame())
+        
+        if not rules_data.empty:
+            # Add evaluation toggle
+            run_evaluation = st.checkbox("Run Systimport streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
