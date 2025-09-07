@@ -18,7 +18,7 @@ warnings.filterwarnings('ignore')
 # Set page config
 st.set_page_config(
     page_title="Steam Game Recommender",
-    page_icon="🎮",
+    page_icon="ðŸŽ®",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -477,10 +477,10 @@ def evaluate_recommender_enhanced_robust(train_rules, test_user_games_dict, fall
 
 # Main Streamlit App
 def main():
-    st.markdown('<h1 class="main-header">🎮 Steam Game Recommender System</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">ðŸŽ® Steam Game Recommender System</h1>', unsafe_allow_html=True)
     
     # Sidebar configuration
-    st.sidebar.header("⚙️ Configuration")
+    st.sidebar.header("âš™ï¸ Configuration")
     sample_size = st.sidebar.slider("Sample Size", 1000, 50000, 25000, 1000)
     min_games = st.sidebar.slider("Minimum Games per User", 2, 10, 3)
     top_n = st.sidebar.slider("Number of Recommendations", 3, 20, 5)
@@ -488,7 +488,7 @@ def main():
     
     # Export functionality (only show if cache files exist)
     if os.path.exists("enhanced_association_rules.pkl") or os.path.exists("evaluation_results.pkl"):
-        st.sidebar.subheader("📦 Export Results")
+        st.sidebar.subheader("ðŸ“¦ Export Results")
         
         if st.sidebar.button("Export to CSV"):
             exported_files = []
@@ -554,7 +554,7 @@ def main():
                 
                 zip_buffer.seek(0)
                 st.sidebar.download_button(
-                    label="📥 Download Project Files",
+                    label="ðŸ“¥ Download Project Files",
                     data=zip_buffer.getvalue(),
                     file_name="steam_recommender_cache.zip",
                     mime="application/zip"
@@ -563,7 +563,7 @@ def main():
                 st.sidebar.error(f"Zip creation failed: {e}")
     
     # Cache management
-    st.sidebar.subheader("🗂️ Cache Management")
+    st.sidebar.subheader("ðŸ—‚ï¸ Cache Management")
     
     # Direct download buttons for pickle files
     if os.path.exists("enhanced_association_rules.pkl"):
@@ -589,12 +589,12 @@ def main():
     # Cache control buttons
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        if st.button("🔄 Reload Data", key="reload_data_btn"):
+        if st.button("ðŸ”„ Reload Data", key="reload_data_btn"):
             st.cache_data.clear()
             st.rerun()
     
     with col2:
-        if st.button("🗑️ Clear Cache", key="clear_cache_btn"):
+        if st.button("ðŸ—‘ï¸ Clear Cache", key="clear_cache_btn"):
             try:
                 if os.path.exists("enhanced_association_rules.pkl"):
                     os.remove("enhanced_association_rules.pkl")
@@ -646,7 +646,7 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Main tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Get Recommendations", "📊 System Analytics", "🔍 Explore Rules", "📈 Performance Evaluation"])
+    tab1, tab2, tab3, tab4 = st.tabs(["ðŸŽ¯ Get Recommendations", "ðŸ“Š System Analytics", "ðŸ” Explore Rules", "ðŸ“ˆ Performance Evaluation"])
     
     with tab1:
         st.header("Get Game Recommendations")
@@ -705,7 +705,7 @@ def main():
                             break
         
         # Get recommendations
-        if st.button("🚀 Get Recommendations", type="primary"):
+        if st.button("ðŸš€ Get Recommendations", type="primary"):
             if not user_games:
                 st.warning("Please enter at least one game!")
             else:
@@ -725,7 +725,7 @@ def main():
                             formatted_name = format_game_name(game)
                             if game in game_data:
                                 formatted_name = game_data[game].get("name", formatted_name)
-                            st.markdown(f'<div class="game-card">🎮 {formatted_name}</div>', 
+                            st.markdown(f'<div class="game-card">ðŸŽ® {formatted_name}</div>', 
                                       unsafe_allow_html=True)
                     
                     st.subheader("Recommended Games:")
@@ -738,7 +738,7 @@ def main():
                         else:
                             genres = "Unknown"
                         
-                        method_emoji = "🔗" if info['method'] == 'association_rules' else "🏷️"
+                        method_emoji = "ðŸ”—" if info['method'] == 'association_rules' else "ðŸ·ï¸"
                         method_name = "Association Rules" if info['method'] == 'association_rules' else "Genre-based"
                         
                         st.markdown(f"""
@@ -971,43 +971,23 @@ def main():
                         success_rate = (avg_evaluated / actual_users * 100) if actual_users > 0 else 0
                         st.metric("Success Rate", f"{success_rate:.1f}%")
                     
-                    # Visualization
+                    # Visualization - Single chart only (Performance Metrics vs K)
                     if len(evaluation_results) > 1:
-                        col1, col2 = st.columns(2)
+                        k_vals = sorted(evaluation_results.keys())
+                        precision_vals = [evaluation_results[k]['precision'] for k in k_vals]
+                        recall_vals = [evaluation_results[k]['recall'] for k in k_vals]
+                        f1_vals = [evaluation_results[k]['f1'] for k in k_vals]
                         
-                        with col1:
-                            k_vals = sorted(evaluation_results.keys())
-                            precision_vals = [evaluation_results[k]['precision'] for k in k_vals]
-                            recall_vals = [evaluation_results[k]['recall'] for k in k_vals]
-                            f1_vals = [evaluation_results[k]['f1'] for k in k_vals]
-                            
-                            fig, ax = plt.subplots(figsize=(8, 6))
-                            ax.plot(k_vals, precision_vals, 'o-', label='Precision', linewidth=2, markersize=8)
-                            ax.plot(k_vals, recall_vals, 's-', label='Recall', linewidth=2, markersize=8)
-                            ax.plot(k_vals, f1_vals, '^-', label='F1-Score', linewidth=2, markersize=8)
-                            ax.set_xlabel('K (Number of Recommendations)')
-                            ax.set_ylabel('Score')
-                            ax.set_title('Performance Metrics vs K')
-                            ax.legend()
-                            ax.grid(True, alpha=0.3)
-                            st.pyplot(fig)
-                        
-                        with col2:
-                            users_evaluated = [evaluation_results[k]['evaluated_users'] for k in k_vals]
-                            
-                            fig, ax = plt.subplots(figsize=(8, 6))
-                            bars = ax.bar(k_vals, users_evaluated, alpha=0.7, color='skyblue', edgecolor='black')
-                            ax.set_xlabel('K (Number of Recommendations)')
-                            ax.set_ylabel('Number of Users Evaluated')
-                            ax.set_title('Users Successfully Evaluated')
-                            ax.grid(True, alpha=0.3, axis='y')
-                            
-                            # Add value labels on bars
-                            for bar, val in zip(bars, users_evaluated):
-                                height = bar.get_height()
-                                ax.text(bar.get_x() + bar.get_width()/2., height,
-                                       f'{val}', ha='center', va='bottom')
-                            st.pyplot(fig)
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        ax.plot(k_vals, precision_vals, 'o-', label='Precision', linewidth=2, markersize=8)
+                        ax.plot(k_vals, recall_vals, 's-', label='Recall', linewidth=2, markersize=8)
+                        ax.plot(k_vals, f1_vals, '^-', label='F1-Score', linewidth=2, markersize=8)
+                        ax.set_xlabel('K (Number of Recommendations)')
+                        ax.set_ylabel('Score')
+                        ax.set_title('Performance Metrics vs K')
+                        ax.legend()
+                        ax.grid(True, alpha=0.3)
+                        st.pyplot(fig)
                     
                     # Detailed analysis
                     st.subheader("📋 Detailed Analysis")
