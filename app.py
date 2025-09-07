@@ -52,6 +52,13 @@ st.markdown("""
         font-weight: bold;
         color: #333;
     }
+    .evaluation-card {
+        background-color: #e8f4fd;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #2196F3;
+        margin: 0.5rem 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -309,6 +316,87 @@ def recommend_games_enhanced(user_games, rules, fallback_map=None, game_data=Non
     
     return sorted_recommendations[:top_n]
 
+def recommend_games_list_only(user_games, rules, fallback_map=None, top_n=5):
+    """Simple recommendation function that returns only game names"""
+    recommendations = recommend_games_enhanced(user_games, rules, fallback_map, None, top_n)
+    return [game for game, _ in recommendations]
+
+@st.cache_data
+def evaluate_recommender_enhanced(train_rules, test_user_games_dict, fallback_map, k_values=[5, 10, 20]):
+    """Evaluate the enhanced recommender system"""
+    if not test_user_games_dict:
+        return {}
+    
+    min_games_for_eval = 5
+    eligible_test_users = {uid: games for uid, games in test_user_games_dict.items() 
+                          if len(games) >= min_games_for_eval}
+    
+    if len(eligible_test_users) == 0:
+        return {}
+    
+    max_eval_users = min(600, len(eligible_test_users))
+    eval_user_ids = np.random.choice(list(eligible_test_users.keys()), max_eval_users, replace=False)
+    
+    evaluation_results = {}
+    for k in k_values:
+        evaluation_results[k] = {'precision_scores': [], 'recall_scores': [], 'f1_scores': []}
+    
+    users_evaluated = 0
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i, user_id in enumerate(eval_user_ids):
+        # Update progress
+        progress = (i + 1) / len(eval_user_ids)
+        progress_bar.progress(progress)
+        status_text.text(f"Evaluating user {i+1}/{len(eval_user_ids)} (ID: {user_id})")
+        
+        user_games_list = list(eligible_test_users[user_id])
+        user_train_games, user_test_games = train_test_split(user_games_list, test_size=0.3, random_state=42)
+        
+        if len(user_train_games) == 0 or len(user_test_games) == 0:
+            continue
+            
+        for k in k_values:
+            try:
+                recommendations = recommend_games_list_only(user_train_games, train_rules, fallback_map, top_n=k)
+                
+                if len(recommendations) == 0:
+                    precision = recall = f1 = 0.0
+                else:
+                    rec_set = set(normalize_name(game) for game in recommendations)
+                    test_set = set(normalize_name(game) for game in user_test_games)
+                    
+                    true_positives = len(rec_set.intersection(test_set))
+                    precision = true_positives / len(rec_set) if len(rec_set) > 0 else 0.0
+                    recall = true_positives / len(test_set) if len(test_set) > 0 else 0.0
+                    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+                
+                evaluation_results[k]['precision_scores'].append(precision)
+                evaluation_results[k]['recall_scores'].append(recall)
+                evaluation_results[k]['f1_scores'].append(f1)
+                
+            except Exception:
+                continue
+        
+        users_evaluated += 1
+    
+    progress_bar.empty()
+    status_text.empty()
+    
+    # Calculate averages
+    final_results = {}
+    for k in k_values:
+        if len(evaluation_results[k]['precision_scores']) > 0:
+            final_results[k] = {
+                'precision': np.mean(evaluation_results[k]['precision_scores']),
+                'recall': np.mean(evaluation_results[k]['recall_scores']),
+                'f1': np.mean(evaluation_results[k]['f1_scores']),
+                'evaluated_users': len(evaluation_results[k]['precision_scores'])
+            }
+    
+    return final_results
+
 # Main Streamlit App
 def main():
     st.markdown('<h1 class="main-header">🎮 Steam Game Recommender System</h1>', unsafe_allow_html=True)
@@ -388,7 +476,7 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Main tabs
-    tab1, tab2, tab3 = st.tabs(["🎯 Get Recommendations", "📊 System Analytics", "🔍 Explore Rules"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Get Recommendations", "📊 System Analytics", "🔍 Explore Rules", "📈 Performance Evaluation"])
     
     with tab1:
         st.header("Get Game Recommendations")
@@ -549,9 +637,215 @@ def main():
         else:
             st.warning("No association rules available to explore.")
     
+    with tab4:
+        st.header("Performance Evaluation")
+        st.write("This evaluation splits test users' games into train/test sets and measures how well the recommender predicts the held-out games.")
+        
+        # Evaluation configuration
+        col1, col2 = st.columns(2)
+        with col1:
+            eval_k_values = st.multiselect(
+                "Select K values for evaluation:",
+                [5, 10, 15, 20, 25, 30],
+                default=[5, 10, 20]
+            )
+        
+        with col2:
+            run_evaluation = st.button("🚀 Run Evaluation", type="primary")
+        
+        if run_evaluation and eval_k_values:
+            if not test_user_games:
+                st.error("No test users available for evaluation.")
+            else:
+                st.info(f"Starting evaluation with {len(test_user_games)} test users...")
+                
+                with st.spinner("Running evaluation... This may take a few minutes."):
+                    evaluation_results = evaluate_recommender_enhanced(
+                        rules, test_user_games, genre_fallback, eval_k_values
+                    )
+                
+                if evaluation_results:
+                    st.success("Evaluation completed!")
+                    
+                    # Display results
+                    st.subheader("📊 Evaluation Results")
+                    
+                    # Create metrics display
+                    metrics_data = []
+                    for k in sorted(evaluation_results.keys()):
+                        metrics = evaluation_results[k]
+                        metrics_data.append({
+                            'K': k,
+                            'Precision': f"{metrics['precision']:.4f}",
+                            'Recall': f"{metrics['recall']:.4f}",
+                            'F1-Score': f"{metrics['f1']:.4f}",
+                            'Users Evaluated': metrics['evaluated_users']
+                        })
+                    
+                    metrics_df = pd.DataFrame(metrics_data)
+                    st.dataframe(metrics_df, use_container_width=True)
+                    
+                    # Visualization
+                    if len(evaluation_results) > 1:
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Precision/Recall/F1 comparison
+                            k_vals = sorted(evaluation_results.keys())
+                            precision_vals = [evaluation_results[k]['precision'] for k in k_vals]
+                            recall_vals = [evaluation_results[k]['recall'] for k in k_vals]
+                            f1_vals = [evaluation_results[k]['f1'] for k in k_vals]
+                            
+                            fig, ax = plt.subplots(figsize=(8, 6))
+                            ax.plot(k_vals, precision_vals, 'o-', label='Precision', linewidth=2)
+                            ax.plot(k_vals, recall_vals, 's-', label='Recall', linewidth=2)
+                            ax.plot(k_vals, f1_vals, '^-', label='F1-Score', linewidth=2)
+                            ax.set_xlabel('K (Number of Recommendations)')
+                            ax.set_ylabel('Score')
+                            ax.set_title('Performance Metrics vs K')
+                            ax.legend()
+                            ax.grid(True, alpha=0.3)
+                            st.pyplot(fig)
+                        
+                        with col2:
+                            # Users evaluated
+                            users_evaluated = [evaluation_results[k]['evaluated_users'] for k in k_vals]
+                            
+                            fig, ax = plt.subplots(figsize=(8, 6))
+                            ax.bar(k_vals, users_evaluated, alpha=0.7, color='skyblue', edgecolor='black')
+                            ax.set_xlabel('K (Number of Recommendations)')
+                            ax.set_ylabel('Number of Users Evaluated')
+                            ax.set_title('Users Successfully Evaluated')
+                            ax.grid(True, alpha=0.3, axis='y')
+                            for i, v in enumerate(users_evaluated):
+                                ax.text(k_vals[i], v + max(users_evaluated) * 0.01, str(v), ha='center')
+                            st.pyplot(fig)
+                    
+                    # Detailed analysis
+                    st.subheader("📋 Detailed Analysis")
+                    
+                    best_f1_k = max(evaluation_results.keys(), key=lambda k: evaluation_results[k]['f1'])
+                    best_precision_k = max(evaluation_results.keys(), key=lambda k: evaluation_results[k]['precision'])
+                    best_recall_k = max(evaluation_results.keys(), key=lambda k: evaluation_results[k]['recall'])
+                    
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="evaluation-card">
+                            <h4>🎯 Best F1-Score</h4>
+                            <p><strong>K = {best_f1_k}</strong></p>
+                            <p>F1: {evaluation_results[best_f1_k]['f1']:.4f}</p>
+                            <p>Precision: {evaluation_results[best_f1_k]['precision']:.4f}</p>
+                            <p>Recall: {evaluation_results[best_f1_k]['recall']:.4f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        st.markdown(f"""
+                        <div class="evaluation-card">
+                            <h4>🎯 Best Precision</h4>
+                            <p><strong>K = {best_precision_k}</strong></p>
+                            <p>Precision: {evaluation_results[best_precision_k]['precision']:.4f}</p>
+                            <p>F1: {evaluation_results[best_precision_k]['f1']:.4f}</p>
+                            <p>Recall: {evaluation_results[best_precision_k]['recall']:.4f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col3:
+                        st.markdown(f"""
+                        <div class="evaluation-card">
+                            <h4>🎯 Best Recall</h4>
+                            <p><strong>K = {best_recall_k}</strong></p>
+                            <p>Recall: {evaluation_results[best_recall_k]['recall']:.4f}</p>
+                            <p>F1: {evaluation_results[best_recall_k]['f1']:.4f}</p>
+                            <p>Precision: {evaluation_results[best_recall_k]['precision']:.4f}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    # Interpretation
+                    st.subheader("📝 Interpretation")
+                    st.write("""
+                    **Metrics Explanation:**
+                    - **Precision**: Of the games recommended, how many did the user actually like? Higher is better.
+                    - **Recall**: Of the games the user actually liked, how many did we recommend? Higher is better.
+                    - **F1-Score**: Harmonic mean of precision and recall, balancing both metrics.
+                    
+                    **Typical Performance:**
+                    - Precision > 0.05 (5%): Good performance for recommendation systems
+                    - Recall > 0.10 (10%): Good coverage of user preferences  
+                    - F1-Score > 0.07 (7%): Balanced performance
+                    """)
+                    
+                    # Save results option
+                    if st.button("💾 Save Evaluation Results"):
+                        try:
+                            with open("evaluation_results.pkl", 'wb') as f:
+                                pickle.dump(evaluation_results, f)
+                            st.success("Evaluation results saved to evaluation_results.pkl")
+                        except Exception as e:
+                            st.error(f"Error saving results: {e}")
+                
+                else:
+                    st.error("Evaluation failed to produce results. Check your data and try again.")
+        
+        elif run_evaluation and not eval_k_values:
+            st.warning("Please select at least one K value for evaluation.")
+        
+        # Load existing results if available
+        if os.path.exists("evaluation_results.pkl") and not run_evaluation:
+            try:
+                with open("evaluation_results.pkl", 'rb') as f:
+                    saved_results = pickle.load(f)
+                
+                st.info("Found saved evaluation results. Displaying cached data:")
+                
+                # Display cached results
+                metrics_data = []
+                for k in sorted(saved_results.keys()):
+                    metrics = saved_results[k]
+                    metrics_data.append({
+                        'K': k,
+                        'Precision': f"{metrics['precision']:.4f}",
+                        'Recall': f"{metrics['recall']:.4f}",
+                        'F1-Score': f"{metrics['f1']:.4f}",
+                        'Users Evaluated': metrics['evaluated_users']
+                    })
+                
+                metrics_df = pd.DataFrame(metrics_data)
+                st.dataframe(metrics_df, use_container_width=True)
+                
+            except Exception as e:
+                st.error(f"Error loading cached results: {e}")
+        
+        # Evaluation explanation
+        with st.expander("ℹ️ How Evaluation Works"):
+            st.write("""
+            **Evaluation Process:**
+            
+            1. **User Selection**: Select test users with at least 5 games
+            2. **Train/Test Split**: For each user, split their games 70/30
+            3. **Recommendation**: Use 70% of games to recommend K games  
+            4. **Evaluation**: Check how many recommendations appear in the remaining 30%
+            5. **Metrics Calculation**: Calculate precision, recall, and F1-score
+            
+            **Example:**
+            - User has games: [A, B, C, D, E, F, G, H, I, J] (10 games)
+            - Train set: [A, B, C, D, E, F, G] (70%)
+            - Test set: [H, I, J] (30%)
+            - Recommend 5 games based on train set: [X, Y, H, Z, W]
+            - Success: 1 out of 5 recommendations (H) was in test set
+            - Precision = 1/5 = 0.20, Recall = 1/3 = 0.33, F1 = 0.25
+            
+            **Limitations:**
+            - Only evaluates explicit preferences (games user owns)
+            - Doesn't account for games user might like but hasn't bought
+            - Performance depends on dataset size and rule quality
+            """)
+    
     # Footer
     st.markdown("---")
-    st.markdown("**Note:** This system uses association rule mining and genre-based fallback for game recommendations. Results depend on the dataset and may vary based on the sample size and parameters used.")
+    st.markdown("**Note:** This system uses association rule mining and genre-based fallback for game recommendations. The evaluation measures how well the system predicts user preferences based on historical data.")
 
 if __name__ == "__main__":
     main()
